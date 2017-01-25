@@ -443,8 +443,9 @@ static void RestoreScratchTarget(bool lockheld);
 static void RemoveTargetIfNoLongerUsed(PREDICATELOCKTARGET *target,
 						   uint32 targettaghash);
 static void DeleteChildTargetLocks(const PREDICATELOCKTARGETTAG *newtargettag);
-static int	MaxPredicateChildLocks(const PREDICATELOCKTARGETTAG *tag);
-static bool CheckAndPromotePredicateLockRequest(const PREDICATELOCKTARGETTAG *reqtag);
+static int	MaxPredicateChildLocks(const PREDICATELOCKTARGETTAG *tag, Relation relation);
+static bool CheckAndPromotePredicateLockRequest(const PREDICATELOCKTARGETTAG *reqtag,
+												Relation relation);
 static void DecrementParentLocks(const PREDICATELOCKTARGETTAG *targettag);
 static void CreatePredicateLock(const PREDICATELOCKTARGETTAG *targettag,
 					uint32 targettaghash,
@@ -453,7 +454,8 @@ static void DeleteLockTarget(PREDICATELOCKTARGET *target, uint32 targettaghash);
 static bool TransferPredicateLocksToNewTarget(PREDICATELOCKTARGETTAG oldtargettag,
 								  PREDICATELOCKTARGETTAG newtargettag,
 								  bool removeOld);
-static void PredicateLockAcquire(const PREDICATELOCKTARGETTAG *targettag);
+static void PredicateLockAcquire(const PREDICATELOCKTARGETTAG *targettag,
+								 Relation relation);
 static void DropAllPredicateLocksFromTable(Relation relation,
 							   bool transfer);
 static void SetNewSxactGlobalXmin(void);
@@ -2165,18 +2167,28 @@ DeleteChildTargetLocks(const PREDICATELOCKTARGETTAG *newtargettag)
  * tying up all predicate lock resources.
  */
 static int
-MaxPredicateChildLocks(const PREDICATELOCKTARGETTAG *tag)
+MaxPredicateChildLocks(const PREDICATELOCKTARGETTAG *tag, Relation relation)
 {
 	switch (GET_PREDICATELOCKTARGETTAG_TYPE(*tag))
 	{
 		case PREDLOCKTAG_RELATION:
+		{
+			int rel_max_pred_locks = RelationGetMaxPredicateLocksPerRelation(relation, -1);
+			if (rel_max_pred_locks != -1)
+				return rel_max_pred_locks;
 			return max_predicate_locks_per_relation < 0
 				? (max_predicate_locks_per_xact
 				   / (-max_predicate_locks_per_relation)) - 1
 				: max_predicate_locks_per_relation;
+		}
 
 		case PREDLOCKTAG_PAGE:
+		{
+			int rel_max_pred_locks_per_page = RelationGetMaxPredicateLocksPerPage(relation, -1);
+			if (rel_max_pred_locks_per_page != -1)
+				return rel_max_pred_locks_per_page;
 			return max_predicate_locks_per_page;
+		}
 
 		case PREDLOCKTAG_TUPLE:
 
@@ -2202,7 +2214,8 @@ MaxPredicateChildLocks(const PREDICATELOCKTARGETTAG *tag)
  * Returns true if a parent lock was acquired and false otherwise.
  */
 static bool
-CheckAndPromotePredicateLockRequest(const PREDICATELOCKTARGETTAG *reqtag)
+CheckAndPromotePredicateLockRequest(const PREDICATELOCKTARGETTAG *reqtag,
+									Relation relation)
 {
 	PREDICATELOCKTARGETTAG targettag,
 				nexttag,
@@ -2232,7 +2245,7 @@ CheckAndPromotePredicateLockRequest(const PREDICATELOCKTARGETTAG *reqtag)
 			parentlock->childLocks++;
 
 		if (parentlock->childLocks >
-			MaxPredicateChildLocks(&targettag))
+			MaxPredicateChildLocks(&targettag, relation))
 		{
 			/*
 			 * We should promote to this parent lock. Continue to check its
@@ -2248,7 +2261,7 @@ CheckAndPromotePredicateLockRequest(const PREDICATELOCKTARGETTAG *reqtag)
 	if (promote)
 	{
 		/* acquire coarsest ancestor eligible for promotion */
-		PredicateLockAcquire(&promotiontag);
+		PredicateLockAcquire(&promotiontag, relation);
 		return true;
 	}
 	else
@@ -2390,7 +2403,7 @@ CreatePredicateLock(const PREDICATELOCKTARGETTAG *targettag,
  * any finer-grained locks covered by the new one.
  */
 static void
-PredicateLockAcquire(const PREDICATELOCKTARGETTAG *targettag)
+PredicateLockAcquire(const PREDICATELOCKTARGETTAG *targettag, Relation relation)
 {
 	uint32		targettaghash;
 	bool		found;
@@ -2423,7 +2436,7 @@ PredicateLockAcquire(const PREDICATELOCKTARGETTAG *targettag)
 	 * coarser granularity, or whether there are finer-granularity locks to
 	 * clean up.
 	 */
-	if (CheckAndPromotePredicateLockRequest(targettag))
+	if (CheckAndPromotePredicateLockRequest(targettag, relation))
 	{
 		/*
 		 * Lock request was promoted to a coarser-granularity lock, and that
@@ -2459,7 +2472,7 @@ PredicateLockRelation(Relation relation, Snapshot snapshot)
 	SET_PREDICATELOCKTARGETTAG_RELATION(tag,
 										relation->rd_node.dbNode,
 										relation->rd_id);
-	PredicateLockAcquire(&tag);
+	PredicateLockAcquire(&tag, relation);
 }
 
 /*
@@ -2483,7 +2496,7 @@ PredicateLockPage(Relation relation, BlockNumber blkno, Snapshot snapshot)
 									relation->rd_node.dbNode,
 									relation->rd_id,
 									blkno);
-	PredicateLockAcquire(&tag);
+	PredicateLockAcquire(&tag, relation);
 }
 
 /*
@@ -2546,7 +2559,7 @@ PredicateLockTuple(Relation relation, HeapTuple tuple, Snapshot snapshot)
 									 relation->rd_id,
 									 ItemPointerGetBlockNumber(tid),
 									 ItemPointerGetOffsetNumber(tid));
-	PredicateLockAcquire(&tag);
+	PredicateLockAcquire(&tag, relation);
 }
 
 

@@ -263,6 +263,8 @@ typedef struct StdRdOptions
 	AutoVacOpts autovacuum;		/* autovacuum-related options */
 	bool		user_catalog_table; /* use as an additional catalog relation */
 	int			parallel_workers;	/* max number of parallel workers */
+	int			max_predicate_locks_per_relation; /* max number of predicate locks */
+	int			max_predicate_locks_per_page; /* max number of predicate locks per page */
 } StdRdOptions;
 
 #define HEAP_MIN_FILLFACTOR			10
@@ -317,6 +319,25 @@ typedef struct StdRdOptions
 #define RelationGetParallelWorkers(relation, defaultpw) \
 	((relation)->rd_options ? \
 	 ((StdRdOptions *) (relation)->rd_options)->parallel_workers : (defaultpw))
+
+
+/*
+ * RelationGetMaxPredicateLocksPerRelation
+ *		Returns the relation's max_predicate_locks_per_relation reloption setting.
+ *		Note multiple eval of argument!
+ */
+#define RelationGetMaxPredicateLocksPerRelation(relation, defaultmpl) \
+	((relation)->rd_options ? \
+	 ((StdRdOptions *) (relation)->rd_options)->max_predicate_locks_per_relation : (defaultmpl))
+
+/*
+ * RelationGetMaxPredicateLocksPerPage
+ *		Returns the relation's max_predicate_locks_per_page reloption setting.
+ *		Note multiple eval of argument!
+ */
+#define RelationGetMaxPredicateLocksPerPage(relation, defaultmplpp) \
+	((relation)->rd_options ? \
+	 ((StdRdOptions *) (relation)->rd_options)->max_predicate_locks_per_page : (defaultmplpp))
 
 
 /*

@@ -348,6 +348,24 @@ static relopt_int intRelOpts[] =
 		},
 		-1, 0, 1024
 	},
+	{
+		{
+			"max_pred_locks_per_relation",
+			"Maximum number of pages or rows that can be predicate-locked before locking the whole relation.",
+			RELOPT_KIND_HEAP,
+			AccessExclusiveLock,
+		},
+		-1, 0, INT_MAX
+	},
+	{
+		{
+			"max_pred_locks_per_page",
+			"Maximum number of rows on a single page that can be predicate-locked before locking the whole page.",
+			RELOPT_KIND_HEAP,
+			AccessExclusiveLock,
+		},
+		-1, 0, INT_MAX
+	},
 
 	/* list terminator */
 	{{NULL}}
@@ -1397,7 +1415,11 @@ default_reloptions(Datum reloptions, bool validate, relopt_kind kind)
 		{"parallel_workers", RELOPT_TYPE_INT,
 		offsetof(StdRdOptions, parallel_workers)},
 		{"vacuum_cleanup_index_scale_factor", RELOPT_TYPE_REAL,
-		offsetof(StdRdOptions, vacuum_cleanup_index_scale_factor)}
+		offsetof(StdRdOptions, vacuum_cleanup_index_scale_factor)},
+		{"max_pred_locks_per_relation", RELOPT_TYPE_INT,
+		offsetof(StdRdOptions, max_predicate_locks_per_relation)},
+		{"max_pred_locks_per_page", RELOPT_TYPE_INT,
+		offsetof(StdRdOptions, max_predicate_locks_per_page)}
 	};
 
 	options = parseRelOptions(reloptions, validate, kind, &numoptions);
