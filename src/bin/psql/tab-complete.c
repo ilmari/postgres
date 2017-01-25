@@ -2031,6 +2031,8 @@ psql_completion(const char *text, int start, int end)
 			"autovacuum_vacuum_threshold",
 			"fillfactor",
 			"parallel_workers",
+			"max_pred_locks_per_relation",
+			"max_pred_locks_per_page",
 			"log_autovacuum_min_duration",
 			"toast.autovacuum_enabled",
 			"toast.autovacuum_freeze_max_age",

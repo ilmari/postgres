@@ -281,6 +281,10 @@ typedef struct HeapOptions
 	bool		user_catalog_table;		/* use as an additional catalog
 										 * relation */
 	int			parallel_workers;		/* max number of parallel workers */
+	int			max_predicate_locks_per_relation;		/* max number of
+														 * predicate locks */
+	int			max_predicate_locks_per_page;	/* max number of predicate
+												 * locks per page */
 }	HeapOptions;
 
 typedef struct ToastOptions
@@ -328,6 +332,24 @@ typedef struct ToastOptions
 #define HeapGetParallelWorkers(relation, defaultpw) \
 	((relation)->rd_options ? \
 	 ((HeapOptions *) (relation)->rd_options)->parallel_workers : (defaultpw))
+
+/*
+ * HeapGetMaxPredicateLocksPerRelation
+ *		Returns the relation's max_predicate_locks_per_relation reloption setting.
+ *		Note multiple eval of argument!
+ */
+#define HeapGetMaxPredicateLocksPerRelation(relation, defaultmpl) \
+	((relation)->rd_options ? \
+	 ((HeapOptions *) (relation)->rd_options)->max_predicate_locks_per_relation : (defaultmpl))
+
+/*
+ * HeapGetMaxPredicateLocksPerPage
+ *		Returns the relation's max_predicate_locks_per_page reloption setting.
+ *		Note multiple eval of argument!
+ */
+#define HeapGetMaxPredicateLocksPerPage(relation, defaultmplpp) \
+	((relation)->rd_options ? \
+	 ((HeapOptions *) (relation)->rd_options)->max_predicate_locks_per_page : (defaultmplpp))
 
 #define ToastGetTargetPageFreeSpace() \
 	(BLCKSZ * (100 - TOAST_DEFAULT_FILLFACTOR) / 100)

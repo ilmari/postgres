@@ -221,7 +221,7 @@ get_heap_relopt_catalog(void)
 	if (!heap_relopt_catalog)
 	{
 		heap_relopt_catalog = allocateOptionsCatalog(NULL, sizeof(HeapOptions),
-													 14 + 4);	/* 14 - for autovacuum
+													 14 + 6);	/* 14 - for autovacuum
 																 * options, 4 - core
 																 * heap options */
 
@@ -246,6 +246,18 @@ get_heap_relopt_catalog(void)
 								 ShareUpdateExclusiveLock,
 								 0, offsetof(HeapOptions, parallel_workers),
 								 -1, 0, 1024);
+
+		optionsCatalogAddItemInt(heap_relopt_catalog, "max_pred_locks_per_relation",
+								 "Maximum number of pages or rows that can be predicate-locked before locking the whole relation.",
+								 ShareUpdateExclusiveLock,
+								 0, offsetof(HeapOptions, max_predicate_locks_per_relation),
+								 -1, 0, INT_MAX);
+
+		optionsCatalogAddItemInt(heap_relopt_catalog, "max_pred_locks_per_page",
+								 "Maximum number of rows on a single page that can be predicate-locked before locking the whole page.",
+								 ShareUpdateExclusiveLock,
+								 0, offsetof(HeapOptions, max_predicate_locks_per_page),
+								 -1, 0, INT_MAX);
 
 		/*
 		 * A WITH OID / WITHOUT OIDS expressions are converted by syntax
