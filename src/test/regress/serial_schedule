@@ -177,5 +177,6 @@ test: returning
 test: largeobject
 test: with
 test: xml
+test: reloptions
 test: event_trigger
 test: stats

@@ -192,3 +192,8 @@ CREATE TABLE hash_heap_float4 (x float4, y int);
 INSERT INTO hash_heap_float4 VALUES (1.1,1);
 CREATE INDEX hash_idx ON hash_heap_float4 USING hash (x);
 DROP TABLE hash_heap_float4 CASCADE;
+
+-- Check reloptions min max values and that it is not allowed to ALTER
+CREATE INDEX hash_f8_index2 ON hash_f8_heap USING hash (random float8_ops) WITH (fillfactor=9);
+CREATE INDEX hash_f8_index2 ON hash_f8_heap USING hash (random float8_ops) WITH (fillfactor=101);
+ALTER INDEX  hash_f8_index SET (fillfactor=99);

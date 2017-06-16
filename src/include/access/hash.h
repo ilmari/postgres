@@ -225,6 +225,19 @@ typedef struct HashMetaPageData
 
 typedef HashMetaPageData *HashMetaPage;
 
+
+typedef struct HashRelOptions
+{
+	int32		varlena_header_;	/* varlena header (do not touch directly!) */
+	int			fillfactor;		/* page fill factor in percent (0..100) */
+}	HashRelOptions;
+
+
+#define HashGetFillFactor(relation) \
+	((relation)->rd_options ? \
+		((HashRelOptions *) (relation)->rd_options)->fillfactor : \
+		HASH_DEFAULT_FILLFACTOR)
+
 /*
  * Maximum size of a hash index item (it's okay to have only one per page)
  */
@@ -320,7 +333,6 @@ extern IndexBulkDeleteResult *hashbulkdelete(IndexVacuumInfo *info,
 			   void *callback_state);
 extern IndexBulkDeleteResult *hashvacuumcleanup(IndexVacuumInfo *info,
 				  IndexBulkDeleteResult *stats);
-extern bytea *hashoptions(Datum reloptions, bool validate);
 extern bool hashvalidate(Oid opclassoid);
 
 extern Datum hash_any(register const unsigned char *k, register int keylen);
@@ -422,5 +434,7 @@ extern void hashbucketcleanup(Relation rel, Bucket cur_bucket,
 				  double *tuples_removed, double *num_index_tuples,
 				  bool bucket_has_garbage,
 				  IndexBulkDeleteCallback callback, void *callback_state);
+
+extern void *hashgetreloptcatalog(void);
 
 #endif   /* HASH_H */

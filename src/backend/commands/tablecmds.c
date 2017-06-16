@@ -513,7 +513,6 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	Datum		reloptions;
 	ListCell   *listptr;
 	AttrNumber	attnum;
-	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
 	Oid			ofTypeId;
 	ObjectAddress address;
 
@@ -599,13 +598,23 @@ DefineRelation(CreateStmt *stmt, char relkind, Oid ownerId,
 	/*
 	 * Parse and validate reloptions, if any.
 	 */
-	reloptions = transformRelOptions((Datum) 0, stmt->options, NULL, validnsps,
-									 true, false);
-
 	if (relkind == RELKIND_VIEW)
-		(void) view_reloptions(reloptions, true);
+	{
+		reloptions = transformOptions(
+									  get_view_relopt_catalog(),
+									  (Datum) 0, stmt->options, 0);
+	}
 	else
-		(void) heap_reloptions(relkind, reloptions, true);
+	{
+		/* If it is not view, then it if heap */
+		char	   *namespaces[] = HEAP_RELOPT_NAMESPACES;
+		List	   *heapDefList;
+
+		optionsDefListValdateNamespaces(stmt->options, namespaces);
+		heapDefList = optionsDefListFilterNamespaces(stmt->options, NULL);
+		reloptions = transformOptions(get_heap_relopt_catalog(),
+									  (Datum) 0, heapDefList, 0);
+	}
 
 	if (stmt->ofTypename)
 	{
@@ -3113,7 +3122,8 @@ void
 AlterTableInternal(Oid relid, List *cmds, bool recurse)
 {
 	Relation	rel;
-	LOCKMODE	lockmode = AlterTableGetLockLevel(cmds);
+
+	LOCKMODE	lockmode = AlterTableGetLockLevel(relid, cmds);
 
 	rel = relation_open(relid, lockmode);
 
@@ -3155,13 +3165,15 @@ AlterTableInternal(Oid relid, List *cmds, bool recurse)
  * otherwise we might end up with an inconsistent dump that can't restore.
  */
 LOCKMODE
-AlterTableGetLockLevel(List *cmds)
+
+AlterTableGetLockLevel(Oid relid, List *cmds)
 {
 	/*
 	 * This only works if we read catalog tables using MVCC snapshots.
 	 */
 	ListCell   *lcmd;
 	LOCKMODE	lockmode = ShareUpdateExclusiveLock;
+	Relation	rel;
 
 	foreach(lcmd, cmds)
 	{
@@ -3373,7 +3385,10 @@ AlterTableGetLockLevel(List *cmds)
 										 * getTables() */
 			case AT_ResetRelOptions:	/* Uses MVCC in getIndexes() and
 										 * getTables() */
-				cmd_lockmode = AlterTableGetRelOptionsLockLevel((List *) cmd->def);
+				rel = relation_open(relid, NoLock);
+				cmd_lockmode = AlterTableGetRelOptionsLockLevel(rel,
+													castNode(List, cmd->def));
+				relation_close(rel,NoLock);
 				break;
 
 			case AT_AttachPartition:
@@ -4151,7 +4166,7 @@ ATRewriteTables(AlterTableStmt *parsetree, List **wqueue, LOCKMODE lockmode)
 						 errmsg("cannot rewrite system relation \"%s\"",
 								RelationGetRelationName(OldHeap))));
 
-			if (RelationIsUsedAsCatalogTable(OldHeap))
+			if (HeapIsUsedAsCatalogTable(OldHeap))
 				ereport(ERROR,
 						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
 				errmsg("cannot rewrite table \"%s\" used as a catalog table",
@@ -6232,11 +6247,11 @@ ATExecSetOptions(Relation rel, const char *colName, Node *options,
 	/* Generate new proposed attoptions (text array) */
 	datum = SysCacheGetAttr(ATTNAME, tuple, Anum_pg_attribute_attoptions,
 							&isnull);
-	newOptions = transformRelOptions(isnull ? (Datum) 0 : datum,
-									 castNode(List, options), NULL, NULL,
-									 false, isReset);
-	/* Validate new options */
-	(void) attribute_reloptions(newOptions, true);
+
+	newOptions = transformOptions(get_attribute_options_catalog(),
+								  isnull ? (Datum) 0 : datum,
+					  castNode(List, options), OPTIONS_PARSE_MODE_FOR_ALTER |
+							   (isReset ? OPTIONS_PARSE_MODE_FOR_RESET : 0));
 
 	/* Build new tuple. */
 	memset(repl_null, false, sizeof(repl_null));
@@ -10261,7 +10276,7 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	Datum		repl_val[Natts_pg_class];
 	bool		repl_null[Natts_pg_class];
 	bool		repl_repl[Natts_pg_class];
-	static char *validnsps[] = HEAP_RELOPT_NAMESPACES;
+	options_parse_mode parse_mode;
 
 	if (defList == NIL && operation != AT_ReplaceRelOptions)
 		return;					/* nothing to do */
@@ -10290,25 +10305,52 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 								&isnull);
 	}
 
-	/* Generate new proposed reloptions (text array) */
-	newOptions = transformRelOptions(isnull ? (Datum) 0 : datum,
-									 defList, NULL, validnsps, false,
-									 operation == AT_ResetRelOptions);
-
 	/* Validate */
+	parse_mode = OPTIONS_PARSE_MODE_FOR_ALTER;
+	if (operation == AT_ResetRelOptions)
+		parse_mode |= OPTIONS_PARSE_MODE_FOR_RESET;
+
 	switch (rel->rd_rel->relkind)
 	{
 		case RELKIND_RELATION:
 		case RELKIND_TOASTVALUE:
 		case RELKIND_MATVIEW:
 		case RELKIND_PARTITIONED_TABLE:
-			(void) heap_reloptions(rel->rd_rel->relkind, newOptions, true);
+			{
+				char	   *namespaces[] = HEAP_RELOPT_NAMESPACES;
+				List	   *heapDefList;
+
+				optionsDefListValdateNamespaces(defList, namespaces);
+				heapDefList = optionsDefListFilterNamespaces(
+															 defList, NULL);
+				newOptions = transformOptions(get_heap_relopt_catalog(),
+											  isnull ? (Datum) 0 : datum,
+											  heapDefList, parse_mode);
+			}
 			break;
 		case RELKIND_VIEW:
-			(void) view_reloptions(newOptions, true);
+			{
+				newOptions = transformOptions(
+											  get_view_relopt_catalog(),
+											  isnull ? (Datum) 0 : datum,
+											  defList, parse_mode);
+			}
 			break;
 		case RELKIND_INDEX:
-			(void) index_reloptions(rel->rd_amroutine->amoptions, newOptions, true);
+			if (rel->rd_amroutine->amrelopt_catalog)
+			{
+				newOptions = transformOptions(
+									   rel->rd_amroutine->amrelopt_catalog(),
+											  isnull ? (Datum) 0 : datum,
+											  defList, parse_mode);
+			}
+			else
+			{
+				ereport(ERROR,
+						(errcode(ERRCODE_FEATURE_NOT_SUPPORTED),
+						 errmsg("index %s does not support options",
+								RelationGetRelationName(rel))));
+			}
 			break;
 		default:
 			ereport(ERROR,
@@ -10322,7 +10364,7 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	if (rel->rd_rel->relkind == RELKIND_VIEW)
 	{
 		Query	   *view_query = get_view_query(rel);
-		List	   *view_options = untransformRelOptions(newOptions);
+		List	   *view_options = optionsTextArrayToDefList(newOptions);
 		ListCell   *cell;
 		bool		check_option = false;
 
@@ -10382,6 +10424,8 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 	{
 		Relation	toastrel;
 		Oid			toastid = rel->rd_rel->reltoastrelid;
+		List	   *toastDefList;
+		options_parse_mode parse_mode;
 
 		toastrel = heap_open(toastid, lockmode);
 
@@ -10405,12 +10449,15 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 			datum = SysCacheGetAttr(RELOID, tuple, Anum_pg_class_reloptions,
 									&isnull);
 		}
+		parse_mode = OPTIONS_PARSE_MODE_FOR_ALTER;
+		if (operation == AT_ResetRelOptions)
+			parse_mode |= OPTIONS_PARSE_MODE_FOR_RESET;
 
-		newOptions = transformRelOptions(isnull ? (Datum) 0 : datum,
-										 defList, "toast", validnsps, false,
-										 operation == AT_ResetRelOptions);
+		toastDefList = optionsDefListFilterNamespaces(defList, "toast");
 
-		(void) heap_reloptions(RELKIND_TOASTVALUE, newOptions, true);
+		newOptions = transformOptions(get_toast_relopt_catalog(),
+									  isnull ? (Datum) 0 : datum,
+									  toastDefList, parse_mode);
 
 		memset(repl_val, 0, sizeof(repl_val));
 		memset(repl_null, false, sizeof(repl_null));
@@ -10437,6 +10484,18 @@ ATExecSetRelOptions(Relation rel, List *defList, AlterTableType operation,
 		ReleaseSysCache(tuple);
 
 		heap_close(toastrel, NoLock);
+	}
+	else
+	{
+		List	   *toastDefList;
+
+		toastDefList = optionsDefListFilterNamespaces(defList, "toast");
+		if (toastDefList)
+		{
+			ereport(ERROR,
+					(errcode(ERRCODE_INVALID_PARAMETER_VALUE),
+					 errmsg("TOAST relation for this table does not exist. Can't change toast.* storage parameters")));
+		}
 	}
 
 	heap_close(pgclass, RowExclusiveLock);
