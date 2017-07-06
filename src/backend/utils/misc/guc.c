@@ -1605,6 +1605,19 @@ static struct config_bool ConfigureNamesBool[] =
 	},
 
 	{
+		{"really_ignore_system_indexes", PGC_BACKEND, DEVELOPER_OPTIONS,
+			gettext_noop("Disables all use of system indexes."),
+			gettext_noop("This also prevents updating the indexes, so it is not safe "
+						 "to use any database modified while this is active without "
+						 "ignore_system_indexes."),
+			GUC_NOT_IN_SAMPLE
+		},
+		&ReallyIgnoreSystemIndexes,
+		false,
+		NULL, NULL, NULL
+	},
+
+	{
 		{"lo_compat_privileges", PGC_SUSET, COMPAT_OPTIONS_PREVIOUS,
 			gettext_noop("Enables backward compatibility mode for privilege checks on large objects."),
 			gettext_noop("Skips privilege checks when reading or modifying large objects, "

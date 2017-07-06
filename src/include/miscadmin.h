@@ -424,6 +424,7 @@ extern void BaseInit(void);
 
 /* in utils/init/miscinit.c */
 extern bool IgnoreSystemIndexes;
+extern bool ReallyIgnoreSystemIndexes;
 extern PGDLLIMPORT bool process_shared_preload_libraries_in_progress;
 extern char *session_preload_libraries_string;
 extern char *shared_preload_libraries_string;

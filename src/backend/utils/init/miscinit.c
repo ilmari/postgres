@@ -68,10 +68,12 @@ static Latch LocalLatchData;
  * for lookups (either in hardwired catalog accesses or in planner-generated
  * plans).  We do, however, still update the indexes when a catalog
  * modification is made.
+ * "really ignoring system indexes" doesn't even try to open them.
  * ----------------------------------------------------------------
  */
 
 bool		IgnoreSystemIndexes = false;
+bool		ReallyIgnoreSystemIndexes = false;
 
 
 /* ----------------------------------------------------------------

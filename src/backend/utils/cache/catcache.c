@@ -977,6 +977,7 @@ InitCatCachePhase2(CatCache *cache, bool touch_index)
 		CatalogCacheInitializeCache(cache);
 
 	if (touch_index &&
+		!ReallyIgnoreSystemIndexes &&
 		cache->id != AMOID &&
 		cache->id != AMNAME)
 	{

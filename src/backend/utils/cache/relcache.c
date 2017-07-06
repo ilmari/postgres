@@ -3691,7 +3691,7 @@ RelationCacheInitializePhase3(void)
 	 * relcache load when a rel does have rules or triggers, so we choose to
 	 * nail them for performance reasons.
 	 */
-	if (!criticalRelcachesBuilt)
+	if (!criticalRelcachesBuilt && !ReallyIgnoreSystemIndexes)
 	{
 		load_critical_index(ClassOidIndexId,
 							RelationRelationId);
@@ -3725,7 +3725,7 @@ RelationCacheInitializePhase3(void)
 	 * critical for the core system, but authentication hooks might be
 	 * interested in it.
 	 */
-	if (!criticalSharedRelcachesBuilt)
+	if (!criticalSharedRelcachesBuilt && !ReallyIgnoreSystemIndexes)
 	{
 		load_critical_index(DatabaseNameIndexId,
 							DatabaseRelationId);
@@ -5686,7 +5686,7 @@ load_relcache_init_file(bool shared)
 				 nailed_rels, nailed_indexes,
 				 NUM_CRITICAL_SHARED_RELS, NUM_CRITICAL_SHARED_INDEXES);
 			/* Make sure we get developers' attention about this */
-			Assert(false);
+			Assert(nailed_indexes == NUM_CRITICAL_SHARED_INDEXES || ReallyIgnoreSystemIndexes);
 			/* In production builds, recover by bootstrapping the relcache */
 			goto read_failed;
 		}

@@ -667,7 +667,7 @@ PostmasterMain(int argc, char *argv[])
 	 * tcop/postgres.c (the option sets should not conflict) and with the
 	 * common help() function in main/main.c.
 	 */
-	while ((opt = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijk:lN:nOo:Pp:r:S:sTt:W:-:")) != -1)
+	while ((opt = getopt(argc, argv, "B:bc:C:D:d:EeFf:h:ijk:lN:nOo:Pp:Rr:S:sTt:W:-:")) != -1)
 	{
 		switch (opt)
 		{
@@ -759,6 +759,11 @@ PostmasterMain(int argc, char *argv[])
 
 			case 'p':
 				SetConfigOption("port", optarg, PGC_POSTMASTER, PGC_S_ARGV);
+				break;
+
+			case 'R':
+				SetConfigOption("ignore_system_indexes", "true", PGC_POSTMASTER, PGC_S_ARGV);
+				SetConfigOption("really_ignore_system_indexes", "true", PGC_POSTMASTER, PGC_S_ARGV);
 				break;
 
 			case 'r':

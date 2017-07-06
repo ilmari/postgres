@@ -18,6 +18,7 @@
 #include "access/htup_details.h"
 #include "catalog/index.h"
 #include "catalog/indexing.h"
+#include "miscadmin.h"
 #include "executor/executor.h"
 #include "utils/rel.h"
 
@@ -41,6 +42,9 @@ CatalogOpenIndexes(Relation heapRel)
 {
 	ResultRelInfo *resultRelInfo;
 
+	if (ReallyIgnoreSystemIndexes)
+		return NULL;
+
 	resultRelInfo = makeNode(ResultRelInfo);
 	resultRelInfo->ri_RangeTableIndex = 1;	/* dummy */
 	resultRelInfo->ri_RelationDesc = heapRel;
@@ -57,6 +61,9 @@ CatalogOpenIndexes(Relation heapRel)
 void
 CatalogCloseIndexes(CatalogIndexState indstate)
 {
+	if (ReallyIgnoreSystemIndexes)
+		return;
+
 	ExecCloseIndices(indstate);
 	pfree(indstate);
 }
@@ -82,6 +89,9 @@ CatalogIndexInsert(CatalogIndexState indstate, HeapTuple heapTuple)
 
 	/* HOT update does not require index inserts */
 	if (HeapTupleIsHeapOnly(heapTuple))
+		return;
+
+	if (ReallyIgnoreSystemIndexes)
 		return;
 
 	/*
