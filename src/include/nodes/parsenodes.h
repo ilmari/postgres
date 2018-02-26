@@ -1956,6 +1956,7 @@ typedef struct CopyStmt
 	bool		is_program;		/* is 'filename' a program to popen? */
 	char	   *filename;		/* filename, or NULL for STDIN/STDOUT */
 	List	   *options;		/* List of DefElem nodes */
+	OnConflictClause *onConflictClause; /* ON CONFLICT clause */
 } CopyStmt;
 
 /* ----------------------

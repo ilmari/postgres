@@ -2967,6 +2967,7 @@ ClosePortalStmt:
 
 CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 			copy_from opt_program copy_file_name copy_delimiter opt_with copy_options
+			opt_on_conflict
 				{
 					CopyStmt *n = makeNode(CopyStmt);
 					n->relation = $3;
@@ -2975,6 +2976,13 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 					n->is_from = $6;
 					n->is_program = $7;
 					n->filename = $8;
+					n->onConflictClause = $12;
+
+					if (!n->is_from && n->onConflictClause != NULL)
+						ereport(ERROR,
+								(errcode(ERRCODE_SYNTAX_ERROR),
+								 errmsg("ON CONFLICT only allowed with COPY FROM"),
+								 parser_errposition(@12)));
 
 					if (n->is_program && n->filename == NULL)
 						ereport(ERROR,
@@ -3004,6 +3012,7 @@ CopyStmt:	COPY opt_binary qualified_name opt_column_list opt_oids
 					n->is_program = $6;
 					n->filename = $7;
 					n->options = $9;
+					n->onConflictClause = NULL;
 
 					if (n->is_program && n->filename == NULL)
 						ereport(ERROR,
