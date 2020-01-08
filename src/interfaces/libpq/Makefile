@@ -88,9 +88,9 @@ endif
 
 SHLIB_EXPORTS = exports.txt
 
-all: all-lib
+SHLIB_PREREQS = submake-libpgport
 
-all-lib: | submake-libpgport
+all: all-lib
 
 # Shared library stuff
 include $(top_srcdir)/src/Makefile.shlib
