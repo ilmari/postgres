@@ -18,7 +18,7 @@ LIBS += $(PTHREAD_LIBS)
 # By default, do nothing.
 all:
 
-update-unicode: unicode_norm_table.h unicode_combining_table.h
+update-unicode: unicode_norm_table.h unicode_combining_table.h | submake-generated-headers
 	$(MAKE) normalization-check
 	mv unicode_norm_table.h unicode_combining_table.h ../../../src/include/common/
 
@@ -40,7 +40,7 @@ unicode_combining_table.h: generate-unicode_combining_table.pl UnicodeData.txt
 normalization-check: norm_test
 	./norm_test
 
-norm_test: norm_test.o ../unicode_norm.o
+norm_test: norm_test.o ../unicode_norm.o | submake-generated-headers submake-libpgport
 
 norm_test.o: norm_test_table.h
 
